@@ -13,24 +13,35 @@ OFFSET_X = 720
 OFFSET_Y = 240
 
 # Colors
-white = (255, 255, 255)
-black = (0, 0, 0)
-wood = (34, 139, 34)
-sheep = (117, 210, 43)
-brick = (179, 89, 0)
-wheat = (210, 194, 43)
-ore = (19, 19, 18)
-desert = (228, 197, 132)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+BLUE = (20, 80, 250)
+TAN = (225, 200, 125)
 
-# Resources
-hex_counts = [
-    ("wood", 4),
-    ("sheep", 4),
-    ("brick", 4),
-    ("wheat", 3),
-    ("ore", 3),
-    ("desert", 1)
-]
+# Resources and their color codes
+resource_colors = {
+    "wood": (34, 139, 34),
+    "sheep": (117, 210, 43),
+    "brick": (179, 89, 0),
+    "wheat": (210, 194, 43),
+    "ore": (19, 19, 18),
+    "desert": (228, 197, 132),
+    "sea": (20, 80, 250)
+}
+
+# Resources and their desired counts
+resource_counts = {
+    "wood": 4,
+    "sheep": 4,
+    "brick": 3,
+    "wheat": 4,
+    "ore": 3,
+    "desert": 1,
+    "sea": 0
+}
+
+# Numbers for token generation
+number_list = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]
 
 # Create a Pygame window
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -48,14 +59,8 @@ def hexagon_points(center, size):
 
 # Define hexagon drawing function
 def draw_hexagon(center, size):
-    points = []
-    for i in range(6):
-        angle_deg = 60 * i
-        angle_rad = math.radians(angle_deg)
-        x = center[0] + size * math.sin(angle_rad)
-        y = center[1] + size * math.cos(angle_rad)
-        points.append((x, y))
-    pygame.draw.polygon(screen, black, points, 2)
+    points = hexagon_points(center, size)
+    pygame.draw.polygon(screen, WHITE, points, 2)
 
 # Function to calculate hexagon centers based on grid pattern
 def calculate_hex_centers():
@@ -72,43 +77,60 @@ def calculate_hex_centers():
 
     return hex_centers
 
-def assign_resource(hex_centers, hex_counts, max_resource_count):
-    resource_list = list(hex_counts.keys())
-    random.shuffle(resource_list)
+# Calculating the distance between two hex centers
+def distance(hex1, hex2):
+    x1, y1 = hex1 
+    x2, y2 = hex2
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-    hex_mapping = {}
-    resource_count = {resource: 0 for resource in hex_counts}
+# Creating and randomizing the hexagons. The function will randomly assign each hex center a resource from resource_counts
+def assign_resources(hex_centers, resource_counts):
+    
+    random.shuffle(number_list)
+    hex_mapping = []
+    
+    for resource, count in resource_counts.items():
+        for _ in range(count):
+            if resource == "desert":
+                hex_mapping.append((resource, _, resource_colors[resource]))
+            else:
+                number = number_list.pop()
+                hex_mapping.append((resource, number, resource_colors[resource]))
+
+    random.shuffle(hex_mapping)
 
     for center in hex_centers:
-        if not resource_list:
-            resource_list = list(hex_counts.keys())
-            random.shuffle(resource_list)
+        resource, number, color = hex_mapping.pop()
 
-        resource = resource_list.pop()
-        if resource_count[resource] < max_resource_count:
-            hex_mapping[center] = (resource, hex_counts[resource])
-            resource_count[resource] += 1
+        if resource == "desert" or resource == "sea":
+            pygame.draw.polygon(screen, color, hexagon_points(center, HEX_SIZE), 0) 
+        else:
+            pygame.draw.polygon(screen, color, hexagon_points(center, HEX_SIZE), 0)
+            pygame.draw.circle(screen, TAN, center, 20, 0)
+            font = pygame.font.Font(None, 36)
+            if number == 6 or number == 8:
+                text = font.render(str(number), True, (200, 0, 0))
+            else:
+                text = font.render(str(number), True, (0, 0, 0))
+            text_rect = text.get_rect(center=center)
+            screen.blit(text, text_rect)
     
+        draw_hexagon(center, HEX_SIZE)
+
     return hex_mapping
+
 
 # Main loop
 running = True
 hex_centers = calculate_hex_centers()
-hex_mapping = assign_resource(hex_centers, hex_counts, 4)
+hex_mapping = assign_resources(hex_centers, resource_counts)
+
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    screen.fill(white)
-
-    for center in hex_centers:
-        resource, color = hex_mapping.get(center, ("", (255, 255, 255)))
-        pygame.draw.polygon(screen, color, hexagon_points(center, HEX_SIZE), 0)
-        draw_hexagon(center, HEX_SIZE)
-
     pygame.display.flip()
 
 pygame.quit()
-
-
