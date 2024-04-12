@@ -10,7 +10,7 @@ WIDTH, HEIGHT = 1440, 960
 HEX_SIZE = 80  # Hexagon size
 HEX_SPACING = 1.5  # Spacing between hexagons
 OFFSET_X = 720
-OFFSET_Y = 240
+OFFSET_Y = 125
 
 # Colors
 WHITE = (255, 255, 255)
@@ -24,24 +24,11 @@ resource_colors = {
     "sheep": (117, 210, 43),
     "brick": (179, 89, 0),
     "wheat": (210, 194, 43),
-    "ore": (19, 19, 18),
+    "ore": (59, 59, 58),
     "desert": (228, 197, 132),
-    "sea": (20, 80, 250)
+    "sea": (20, 80, 250),
+    "gold": (182, 138, 0)
 }
-
-# Resources and their desired counts
-resource_counts = {
-    "wood": 4,
-    "sheep": 4,
-    "brick": 3,
-    "wheat": 4,
-    "ore": 3,
-    "desert": 1,
-    "sea": 0
-}
-
-# Numbers for token generation
-number_list = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]
 
 # Create a Pygame window
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -65,7 +52,7 @@ def draw_hexagon(center, size):
 # Function to calculate hexagon centers based on grid pattern
 def calculate_hex_centers():
     hex_centers = []
-    row_lengths = [3, 4, 5, 4, 3]
+    row_lengths = [5, 6, 7, 8, 7, 6, 5]
 
     for row, row_length in enumerate(row_lengths):
         y = row * (HEX_SIZE * 1.5) + OFFSET_Y
@@ -75,62 +62,137 @@ def calculate_hex_centers():
             x = x_start + col * (HEX_SIZE * math.sqrt(3) + HEX_SPACING)
             hex_centers.append((x, y))
 
-    return hex_centers
+    return hex_centers 
 
-# Calculating the distance between two hex centers
-def distance(hex1, hex2):
-    x1, y1 = hex1 
-    x2, y2 = hex2
-    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+def generate_board():
+    board = [[(0, ""), (0, ""), (0, ""), (13, "sea", (20, 80, 250)), (0, "")],
+            [(0, ""), (0, ""), (0, ""), (0, ""), (13, "sea", (20, 80, 250)), (0, "")], 
+            [(0, ""), (0, ""), (0, ""), (0, ""), (0, ""), (13, "sea", (20, 80, 250)), (13, "sea", (20, 80, 250))],
+            [(13, "sea", (20, 80, 250)), (0, ""), (0, ""), (0, ""), (0, ""), (13, "sea", (20, 80, 250)), (0, ""), (13, "sea", (20, 80, 250))],
+            [(13, "sea", (20, 80, 250)), (0, ""), (0, ""), (0, ""), (13, "sea", (20, 80, 250)), (0, ""), (13, "sea", (20, 80, 250))],
+            [(13, "sea", (20, 80, 250)), (13, "sea", (20, 80, 250)), (13, "sea", (20, 80, 250)), (13, "sea", (20, 80, 250)), (0, ""), (0, "")],
+            [(0, ""), (0, ""), (13, "sea", (20, 80, 250)), (0, ""), (13, "sea", (20, 80, 250))]]
+    
+    return board
 
-# Creating and randomizing the hexagons. The function will randomly assign each hex center a resource from resource_counts
-def assign_resources(hex_centers, resource_counts):
+def check_constraints(board, x, y, value):
+    # Check if the value conflicts with the constraints in the same row
+    if 6 in board[y] or 8 in board[y]:
+        if value == 6 or value == 8:
+            # Check if the previous position in the row contains 6 or 8
+            if x > 0 and (board[y][x - 1] == 6 or board[y][x - 1] == 8):
+                return False
+
+    # Check if the value conflicts with the constraints in the previous row
+    if y > 0:
+        prev_row = board[y - 1]
+        if x > 0 and (x - 1) < len(prev_row) and (prev_row[x - 1] == 6 or prev_row[x - 1] == 8):
+            if value == 6 or value == 8:
+                return False
+        if x < len(prev_row) and (prev_row[x] == 6 or prev_row[x] == 8):
+            if value == 6 or value == 8:
+                return False
+        if x < len(prev_row) - 1 and (x + 1) < len(prev_row) and (prev_row[x + 1] == 6 or prev_row[x + 1] == 8):
+            if value == 6 or value == 8:
+                return False
+
+    return True
+
+def fill_board(board, numbers, resource_list):
+    for y in range(len(board)):
+        for x in range(len(board[y])):
+            # Skip positions that are "locked" with 13
+            if board[y][x][0] != 0:
+                continue
+            
+            valid_numbers = [num for num in numbers if check_constraints(board, x, y, num)]
+            if not valid_numbers:
+                return False  # No valid number for this cell
+            board[y][x] = random.choice(valid_numbers)
+            numbers.remove(board[y][x])
     
-    random.shuffle(number_list)
-    hex_mapping = []
-    
-    for resource, count in resource_counts.items():
-        for _ in range(count):
-            if resource == "desert":
-                hex_mapping.append((resource, _, resource_colors[resource]))
+    random.shuffle(resource_list)
+    index = 0
+    for row in board:
+        for i in range(len(row)):
+            if isinstance(row[i], tuple) and row[i][1] == "sea":
+                continue
+            if row[i] == 1:
+                row[i] = ((row[i], "desert", resource_colors["desert"]))
             else:
-                number = number_list.pop()
-                hex_mapping.append((resource, number, resource_colors[resource]))
+                if index < len(resource_list):
+                    resource = resource_list[index]
+                    row[i] = ((row[i], resource, resource_colors[resource]))
+                    index += 1
+                else:
+                    break
+                    # No more resources to fill the board
 
-    random.shuffle(hex_mapping)
+    return True
 
-    for center in hex_centers:
-        resource, number, color = hex_mapping.pop()
 
-        if resource == "desert" or resource == "sea":
-            pygame.draw.polygon(screen, color, hexagon_points(center, HEX_SIZE), 0) 
-        else:
-            pygame.draw.polygon(screen, color, hexagon_points(center, HEX_SIZE), 0)
-            pygame.draw.circle(screen, TAN, center, 20, 0)
-            font = pygame.font.Font(None, 36)
-            if number == 6 or number == 8:
-                text = font.render(str(number), True, (200, 0, 0))
+def assign_resources(hex_centers, board):
+
+    board.reverse() 
+    for lst in board:
+        while lst:
+            center = hex_centers.pop()
+            number, resource, color = lst.pop()  
+
+            if resource == "desert" or resource == "sea":
+                pygame.draw.polygon(screen, color, hexagon_points(center, HEX_SIZE), 0) 
             else:
-                text = font.render(str(number), True, (0, 0, 0))
-            text_rect = text.get_rect(center=center)
-            screen.blit(text, text_rect)
+                pygame.draw.polygon(screen, color, hexagon_points(center, HEX_SIZE), 0)
+                pygame.draw.circle(screen, TAN, center, 20, 0)
+                font = pygame.font.Font(None, 36)
+                if number == 6 or number == 8:
+                    text = font.render(str(number), True, (200, 0, 0))
+                else:
+                    text = font.render(str(number), True, (0, 0, 0))
+                text_rect = text.get_rect(center=center)
+                screen.blit(text, text_rect)
+
+            draw_hexagon(center, HEX_SIZE)
+
+    return board
+
+
+def print_board(board):
+    for row in board:
+        print(row)
+
+def visualize_board():
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+
+        pygame.display.flip()
+
+def main():
     
-        draw_hexagon(center, HEX_SIZE)
+    numbers = [1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 12]
 
-    return hex_mapping
+    resource_list = ["wood", "wood", "wood", "wood", "wood",
+                     "sheep", "sheep", "sheep", "sheep", "sheep",
+                     "brick", "brick", "brick", "brick", "brick",
+                     "wheat", "wheat", "wheat", "wheat", "wheat",
+                     "ore", "ore", "ore", "ore", "ore",
+                     "gold", "gold"]
+    
+    board = generate_board()
 
+    while not fill_board(board, numbers.copy(), resource_list.copy()):
+        board = generate_board()  # Reset the board
 
-# Main loop
-running = True
-hex_centers = calculate_hex_centers()
-hex_mapping = assign_resources(hex_centers, resource_counts)
+    print("Successfully filled the board:")
+    print_board(board)
 
+    hex_centers = calculate_hex_centers()
+    assign_resources(hex_centers, board)
 
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+    visualize_board()
 
-    pygame.display.flip()
-
-pygame.quit()
+if __name__ == "__main__":
+    main()
